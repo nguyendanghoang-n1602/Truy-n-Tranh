@@ -1,6 +1,11 @@
 /**
- * MangaCameraEngine - Cinematic 2.5D Action Camera
- * Interpolates zooms, pans, Dutch angles, whip-snaps, and decaying impact shakes.
+ * MangaCameraEngine - Cinematic 2.5D Action Camera & Non-Linear Transition System
+ * Features:
+ * - Ken Burns pan/zoom with non-linear easing curves (easeInOutCubic, easeInOutSine, easeOutExpo)
+ * - Decaying sinusoidal impact shakes (A * exp(-lambda*t) * cos(omega*t))
+ * - Dynamic dialogue bubble & panel bounding box framing with safe margins
+ * - Seamless cinematic transitions: Cross-dissolve, Zoom-through, Directional Pan-glide, Anime Shutter-wipe
+ * - Eliminates static page-flip effects
  */
 export class MangaCameraEngine {
   constructor() {
@@ -32,7 +37,7 @@ export class MangaCameraEngine {
     return {
       x: osc1 * this.shakeAmplitude,
       y: osc2 * this.shakeAmplitude * 0.8,
-      rot: (osc1 * this.shakeAmplitude * 0.002)
+      rot: osc1 * this.shakeAmplitude * 0.002
     };
   }
 
@@ -51,8 +56,12 @@ export class MangaCameraEngine {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
 
+  static easeInOutSine(t) {
+    return -(Math.cos(Math.PI * t) - 1) / 2;
+  }
+
   /**
-   * Compute transformed viewport for current panel & progress [0..1]
+   * Compute transformed viewport for a panel & progress [0..1]
    */
   computeTransform(panel, progress, viewportWidth, viewportHeight) {
     const cam = panel.camera || {
@@ -86,7 +95,7 @@ export class MangaCameraEngine {
   }
 
   /**
-   * Draw panel image onto canvas with camera transform
+   * Draw standard panel with camera transform (backward compatible)
    */
   drawPanel(ctx, image, panel, progress, viewportWidth, viewportHeight) {
     if (!image || !panel || !panel.bounds) return;
@@ -100,19 +109,169 @@ export class MangaCameraEngine {
     const transform = this.computeTransform(panel, progress, viewportWidth, viewportHeight);
 
     ctx.save();
-
-    // Move to viewport center
     ctx.translate(viewportWidth / 2 + transform.panX, viewportHeight / 2 + transform.panY);
     ctx.rotate(transform.rotation);
     ctx.scale(transform.zoom, transform.zoom);
 
-    // Calculate fit-to-viewport dimensions (cover or contain with bleed)
     const scale = Math.max(viewportWidth / sw, viewportHeight / sh);
     const dw = sw * scale;
     const dh = sh * scale;
 
     ctx.drawImage(image, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
-
     ctx.restore();
+  }
+
+  /**
+   * Draw a framed region (panel or dialogue bubble) with continuous subtle Ken Burns drift
+   */
+  drawFramedRegion(ctx, image, bounds, progress, viewportWidth, viewportHeight, options = {}) {
+    if (!image || !bounds) return;
+
+    const easeT = MangaCameraEngine.easeInOutSine(progress);
+
+    // Default gentle drift during dialogue so frame is alive
+    const zoomStart = options.zoomStart || 1.0;
+    const zoomEnd = options.zoomEnd || 1.08;
+    const zoom = zoomStart + (zoomEnd - zoomStart) * easeT;
+
+    const panShiftX = (options.panShiftX || 0.02) * (easeT - 0.5) * viewportWidth;
+    const panShiftY = (options.panShiftY || 0.02) * (easeT - 0.5) * viewportHeight;
+
+    const shake = this.getShakeOffset();
+
+    const imgW = image.naturalWidth || image.width;
+    const imgH = image.naturalHeight || image.height;
+
+    // Source bounds on image
+    const sx = Math.max(0, bounds.x * imgW);
+    const sy = Math.max(0, bounds.y * imgH);
+    const sw = Math.min(imgW - sx, bounds.w * imgW);
+    const sh = Math.min(imgH - sy, bounds.h * imgH);
+
+    // Viewport scale to cover comfortably
+    const scale = Math.max(viewportWidth / sw, viewportHeight / sh);
+    const dw = sw * scale;
+    const dh = sh * scale;
+
+    ctx.save();
+    ctx.translate(viewportWidth / 2 + panShiftX + shake.x, viewportHeight / 2 + panShiftY + shake.y);
+    ctx.rotate(shake.rot);
+    ctx.scale(zoom, zoom);
+
+    ctx.drawImage(image, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
+  }
+
+  /**
+   * Render cinematic transition between previous scene and next scene
+   * No page-flips! Uses cross-dissolve, zoom-through, pan-glide, or anime shutter-wipe
+   */
+  drawTransition(
+    ctx,
+    prevScene,
+    nextScene,
+    transitionProgress,
+    transitionType = 'cross-dissolve',
+    viewportWidth = 1280,
+    viewportHeight = 720
+  ) {
+    const t = Math.max(0, Math.min(1, transitionProgress));
+
+    switch (transitionType) {
+      case 'zoom-through': {
+        // Prev scene zooms in deeper and fades out
+        const zoomPrev = 1.0 + t * 0.45;
+        const alphaPrev = 1 - MangaCameraEngine.easeInOutCubic(t);
+
+        // Next scene enters slightly zoomed and settles
+        const zoomNext = 1.25 - (1 - t) * 0.15;
+        const alphaNext = MangaCameraEngine.easeInOutCubic(t);
+
+        ctx.save();
+        ctx.globalAlpha = alphaPrev;
+        this.drawFramedRegion(ctx, prevScene.image, prevScene.bounds, 1.0, viewportWidth, viewportHeight, {
+          zoomStart: zoomPrev,
+          zoomEnd: zoomPrev
+        });
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = alphaNext;
+        this.drawFramedRegion(ctx, nextScene.image, nextScene.bounds, 0.0, viewportWidth, viewportHeight, {
+          zoomStart: zoomNext,
+          zoomEnd: zoomNext
+        });
+        ctx.restore();
+        break;
+      }
+
+      case 'pan-glide': {
+        // Glide smoothly in reading direction (e.g., bottom to top when jumping pages)
+        const easeT = MangaCameraEngine.easeInOutCubic(t);
+        const shiftY = easeT * viewportHeight;
+
+        ctx.save();
+        ctx.translate(0, -shiftY);
+        this.drawFramedRegion(ctx, prevScene.image, prevScene.bounds, 1.0, viewportWidth, viewportHeight);
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(0, viewportHeight - shiftY);
+        this.drawFramedRegion(ctx, nextScene.image, nextScene.bounds, 0.0, viewportWidth, viewportHeight);
+        ctx.restore();
+        break;
+      }
+
+      case 'shutter-wipe': {
+        // Anime-style diagonal slash wipe
+        const easeT = MangaCameraEngine.easeInOutCubic(t);
+        const wipePos = easeT * (viewportWidth + viewportHeight);
+
+        // Draw prev scene full
+        this.drawFramedRegion(ctx, prevScene.image, prevScene.bounds, 1.0, viewportWidth, viewportHeight);
+
+        // Mask next scene behind diagonal wipe
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(wipePos - viewportHeight, 0);
+        ctx.lineTo(viewportWidth, 0);
+        ctx.lineTo(viewportWidth, viewportHeight);
+        ctx.lineTo(wipePos, viewportHeight);
+        ctx.closePath();
+        ctx.clip();
+
+        this.drawFramedRegion(ctx, nextScene.image, nextScene.bounds, 0.0, viewportWidth, viewportHeight);
+
+        // Draw glowing edge line
+        ctx.beginPath();
+        ctx.moveTo(wipePos - viewportHeight, 0);
+        ctx.lineTo(wipePos, viewportHeight);
+        ctx.strokeStyle = '#00f0ff';
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 15;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        ctx.restore();
+        break;
+      }
+
+      case 'cross-dissolve':
+      default: {
+        // Smooth opacity dissolve
+        const easeT = MangaCameraEngine.easeInOutQuad(t);
+
+        ctx.save();
+        ctx.globalAlpha = 1 - easeT;
+        this.drawFramedRegion(ctx, prevScene.image, prevScene.bounds, 1.0, viewportWidth, viewportHeight);
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = easeT;
+        this.drawFramedRegion(ctx, nextScene.image, nextScene.bounds, 0.0, viewportWidth, viewportHeight);
+        ctx.restore();
+        break;
+      }
+    }
   }
 }

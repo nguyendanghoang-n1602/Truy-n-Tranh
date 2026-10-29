@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MangaMotion AI Studio - Chuyển Đổi Trang Truyện Sang Video Hành Động</title>
+  <title>MangaMotion AI Studio Pro - Chuyển Đổi Truyện Tranh Sang Video Điện Ảnh</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,30 +16,38 @@
       <div class="brand">
         <div class="brand-icon">⚡</div>
         <div class="brand-title">Manga<span>Motion</span> Pro</div>
-        <span class="badge-pro">Senior Core</span>
+        <span class="badge-pro">Studio AI</span>
       </div>
 
       <div class="header-center">
         <div class="sample-selector" id="samplePicker">
-          <button class="sample-btn active" data-sample="samurai-slash">🗡️ Kiếm Sĩ Trảm Quỷ (Manga)</button>
-          <button class="sample-btn" data-sample="shadow-hunter">⚡ Thợ Săn Lôi Đình (Webtoon)</button>
+          <button class="sample-btn active" data-sample="samurai-slash">🗡️ Kiếm Sĩ (Manga)</button>
+          <button class="sample-btn" data-sample="shadow-hunter">⚡ Thợ Săn (Webtoon)</button>
         </div>
 
-        <label class="upload-label" title="Tải lên trang truyện của bạn (JPG, PNG, WebP)">
-          📁 <span>Tải Trang Khác</span>
-          <input type="file" id="fileUpload" accept="image/*" style="display: none;">
-        </label>
+        <button class="btn-secondary" id="btnOpenChapter" title="Tải chapter truyện tranh (nhiều ảnh hoặc tệp ZIP, tối đa 20 MiB)">
+          📁 <span>Tải Chapter (ZIP/Ảnh)</span>
+        </button>
+        <button class="btn-secondary" id="btnOpenOCR" title="Nhận diện chữ và biên tập nội dung hội thoại">
+          🔍 <span>OCR & Biên Tập Chữ</span>
+        </button>
+        <button class="btn-secondary" id="btnOpenTTS" title="Cấu hình giọng đọc Google Cloud TTS / Trình duyệt">
+          🎙️ <span>Cấu Hình Giọng Đọc</span>
+        </button>
       </div>
 
       <div class="header-actions">
-        <button class="btn-secondary" id="btnAudioToggle" title="Bật/Tắt âm thanh hành động (Synthesizer)">
-          <span id="audioIcon">🔊</span> <span id="audioLabel">Âm thanh: Bật</span>
+        <button class="btn-primary" id="btnReadChapter" title="Đọc toàn bộ chapter với chuyển động camera và lời đọc">
+          ▶️ <span id="btnReadChapterText">Đọc Chapter (TTS)</span>
+        </button>
+        <button class="btn-secondary" id="btnAudioToggle" title="Bật/Tắt âm thanh kỹ xảo">
+          <span id="audioIcon">🔊</span>
         </button>
         <button class="btn-secondary" id="btnOpenAIBridge">
-          🤖 AI Video Bridge
+          🤖 AI Bridge
         </button>
         <button class="btn-primary" id="btnOpenExport">
-          🎬 Xuất Video (MP4/WebM)
+          🎬 Xuất Video
         </button>
       </div>
     </header>
@@ -48,23 +56,52 @@
     <div class="studio-body">
       <!-- Left Sidebar: Panels & Layout Manager -->
       <aside class="panel-sidebar">
-        <div class="sidebar-header">
-          <span class="sidebar-title">Khung Truyện & Phân Cảnh</span>
-          <span class="tag" id="panelCountTag">5 Cảnh</span>
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab-btn active" id="tabActionScenes">⚡ Phân Cảnh Hành Động</button>
+          <button class="sidebar-tab-btn" id="tabChapterPages">📖 Các Trang Chapter</button>
         </div>
 
-        <div class="sidebar-controls">
-          <button class="btn-secondary btn-full-width" id="btnAutoDetect">
-            ✨ Tự Động Quét Panel (AI CV)
-          </button>
-          <button class="btn-secondary btn-full-width" id="btnToggleFullPage">
-            🔍 Xem Toàn Trang & Tùy Chỉnh
-          </button>
+        <!-- Mode 1: Action Scenes (Existing) -->
+        <div id="actionScenesSection" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+          <div class="sidebar-header">
+            <span class="sidebar-title">Khung Truyện & Phân Cảnh</span>
+            <span class="tag" id="panelCountTag">5 Cảnh</span>
+          </div>
+
+          <div class="sidebar-controls">
+            <button class="btn-secondary btn-full-width" id="btnAutoDetect">
+              ✨ Tự Động Quét Panel (AI CV)
+            </button>
+            <button class="btn-secondary btn-full-width" id="btnToggleFullPage">
+              🔍 Xem Toàn Trang & Tùy Chỉnh
+            </button>
+          </div>
+
+          <!-- Scrollable panel scene list -->
+          <div class="panel-list" id="panelListContainer">
+            <!-- Dynamically populated cards -->
+          </div>
         </div>
 
-        <!-- Scrollable panel scene list -->
-        <div class="panel-list" id="panelListContainer">
-          <!-- Dynamically populated cards -->
+        <!-- Mode 2: Chapter Pages List (New) -->
+        <div id="chapterPagesSection" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+          <div class="sidebar-header">
+            <span class="sidebar-title" id="chapterSidebarTitle">Chapter 01</span>
+            <span class="tag" id="chapterPageCountTag">0 Trang</span>
+          </div>
+
+          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 8px;">
+            <button class="btn-secondary" id="btnQuickUpload" style="flex: 1; font-size: 11px;">
+              ➕ Thêm Ảnh / ZIP
+            </button>
+            <button class="btn-primary" id="btnQuickOCR" style="flex: 1; font-size: 11px;">
+              ⚡ Quét OCR
+            </button>
+          </div>
+
+          <div class="panel-list" id="chapterPagesSidebarContainer">
+            <!-- Dynamically populated page cards -->
+          </div>
         </div>
       </aside>
 
@@ -75,6 +112,9 @@
           <div class="hud-panel-info">
             <div class="hud-dot"></div>
             <span id="hudPanelTitle">Panel 1: Rút Kiếm Sát Khí</span>
+            <span id="hudReadingIndicator" class="hud-reading-badge" style="display: none;">
+              🎙️ <span id="hudReadingText">Đang đọc hội thoại...</span>
+            </span>
           </div>
           <div class="hud-stats">
             <span id="hudFps">60 FPS</span> | <span id="hudTimecode">00:00.00 / 00:09.70</span>
@@ -93,7 +133,7 @@
           <div class="fullpage-header">
             <div>
               <h3>Bản Đồ Phân Cắt Trang Truyện (Bounding Box Editor)</h3>
-              <p style="font-size: 12px; color: var(--text-secondary);">Nhấp và kéo các khung xanh để điều chỉnh khu vực camera cắt cho từng cảnh hành động</p>
+              <p style="font-size: 12px; color: var(--text-secondary);">Nhấp các khung màu để điều chỉnh khu vực camera cắt cho từng cảnh hành động hoặc hội thoại</p>
             </div>
             <div style="display: flex; gap: 8px;">
               <button class="btn-secondary" id="btnAddPanelManual">➕ Thêm Khung Mới</button>
@@ -139,6 +179,31 @@
         <div class="director-header">
           <span class="sidebar-title">Đạo Diễn Kỹ Xảo (Director FX)</span>
           <span class="badge-pro" id="currentPanelBadge">P1</span>
+        </div>
+
+        <!-- Cinematic Transitions & Framing Controls (New) -->
+        <div class="section-group">
+          <div class="section-title">🎬 Hiệu Ứng Chuyển Cảnh & Góc Nhìn</div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Kiểu Chuyển Cảnh (Transition)</span>
+            </div>
+            <select id="selectTransition" style="width: 100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <option value="cross-dissolve">✨ Hòa Quyện Mờ Dần (Cross-Dissolve)</option>
+              <option value="zoom-through">🔍 Xuyên Thấu Điện Ảnh (Zoom-Through)</option>
+              <option value="pan-glide">🌊 Lướt Theo Chiều Đọc (Pan-Glide)</option>
+              <option value="shutter-wipe">🗡️ Màn Chập Kiếm Khí (Shutter-Wipe)</option>
+            </select>
+          </div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Tiêu Điểm Camera Đọc Truyện</span>
+            </div>
+            <select id="selectCameraFocusMode" style="width: 100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <option value="dialogue">🎯 Theo Bounding Box Hội Thoại (Dialogue Focus)</option>
+              <option value="panel">🖼️ Toàn Khung Tranh (Full Panel Ken Burns)</option>
+            </select>
+          </div>
         </div>
 
         <!-- Presets -->
@@ -264,14 +329,260 @@
     </div>
   </div>
 
+  <!-- Chapter Ingestion & Management Modal -->
+  <div class="modal-backdrop" id="chapterModal">
+    <div class="modal-window" style="max-width: 780px;">
+      <div class="modal-header">
+        <div class="modal-title">📦 Quản Lý Chapter & Tải Ảnh Truyện</div>
+        <button class="icon-btn" id="btnCloseChapterModal" style="width: 28px; height: 28px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Capacity Monitor -->
+        <div class="capacity-monitor">
+          <div class="capacity-meta">
+            <span id="chapterStatusSummary">Chapter 01 | 0.0 / 20.0 MiB | 0 trang</span>
+            <span id="chapterCapacityPercent">0%</span>
+          </div>
+          <div class="capacity-track">
+            <div class="capacity-fill" id="chapterCapacityFill"></div>
+          </div>
+        </div>
+
+        <!-- Drag & Drop Zone -->
+        <div class="drop-zone" id="chapterDropZone">
+          <div class="drop-zone-icon">📁</div>
+          <div class="drop-zone-title">Kéo thả ảnh hoặc tệp ZIP chapter vào đây</div>
+          <div class="drop-zone-desc">Hỗ trợ định dạng: JPG, PNG, WEBP hoặc tệp ZIP (Tự giải nén nội bộ, tối đa 20 MiB)</div>
+          <input type="file" id="chapterFileInput" multiple accept=".zip,image/jpeg,image/png,image/webp" style="display: none;">
+          <button class="btn-secondary" id="btnBrowseFiles" style="margin-top: 4px;">
+            📂 Chọn Tệp Từ Máy Tính
+          </button>
+        </div>
+
+        <!-- Page Grid -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+          <span style="font-size: 13px; font-weight: 700; color: var(--accent-cyan);">Danh Sách Trang Đã Tải:</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Sắp xếp tự nhiên (1, 2, 10...)</span>
+        </div>
+        <div class="chapter-page-grid" id="chapterModalPageGrid">
+          <!-- Dynamically populated page cards -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnClearChapterModal" style="color: var(--accent-crimson);">
+          🗑️ Xóa Chapter Để Nạp Mới
+        </button>
+        <button class="btn-secondary" id="btnOCRAllFromModal">
+          ⚡ Quét OCR Toàn Bộ
+        </button>
+        <button class="btn-primary" id="btnApplyChapterModal">
+          ✅ Đóng & Xem Truyện
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OCR Text Editor Modal -->
+  <div class="modal-backdrop" id="ocrModal">
+    <div class="modal-window" style="max-width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title">🔍 OCR & Biên Tập Nội Dung Hội Thoại Truyện Tranh</div>
+        <button class="icon-btn" id="btnCloseOCRModal" style="width: 28px; height: 28px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Top Controls: Language & Direction -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+              Ngôn Ngữ Nhận Diện (OCR):
+            </label>
+            <select id="ocrLanguageSelect" style="width: 100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <option value="vie">🇻🇳 Tiếng Việt</option>
+              <option value="eng">🇺🇸 Tiếng Anh (English)</option>
+              <option value="jpn">🇯🇵 Tiếng Nhật (日本語)</option>
+              <option value="kor">🇰🇷 Tiếng Hàn (한국어)</option>
+              <option value="chi_sim">🇨🇳 Tiếng Trung (简体中文)</option>
+            </select>
+          </div>
+
+          <div style="flex: 1; min-width: 200px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+              Thứ Tự Đọc Hội Thoại:
+            </label>
+            <select id="ocrDirectionSelect" style="width: 100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <option value="rtl">📖 Manga Phải sang Trái (RTL Shonen)</option>
+              <option value="ltr">📄 Trái sang Phải (LTR Webtoon/Comic)</option>
+              <option value="vertical">⛩️ Chữ Viết Dọc (Vertical Column)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; align-items: flex-end; gap: 8px;">
+            <button class="btn-primary" id="btnStartOCR">⚡ Bắt Đầu Quét OCR</button>
+            <button class="btn-secondary" id="btnCancelOCR" style="display: none; color: var(--accent-crimson);">Hủy</button>
+          </div>
+        </div>
+
+        <!-- Progress Box -->
+        <div id="ocrProgressBox" style="display: none; background: var(--bg-tertiary); padding: 10px 14px; border-radius: var(--radius-md);">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+            <span id="ocrStatusMsg">Đang chuẩn bị mô hình Tesseract.js...</span>
+            <span id="ocrPercentMsg" style="font-weight: 700; color: var(--accent-cyan);">0%</span>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar-fill" id="ocrProgressBarFill"></div>
+          </div>
+        </div>
+
+        <!-- Page Selector for Editing -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 12px; font-weight: 600;">Xem Trang:</label>
+            <select id="ocrPageSelector" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <!-- Dynamically populated page options -->
+            </select>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);" id="ocrSegmentCountLabel">
+            0 đoạn hội thoại
+          </div>
+        </div>
+
+        <!-- Segments List -->
+        <div class="ocr-segments-list" id="ocrSegmentsContainer">
+          <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+            Chưa có dữ liệu OCR. Hãy nhấn "Bắt Đầu Quét OCR" để trích xuất chữ từ trang truyện.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnPreviewCurrentPageTTS">
+          🔊 Nghe Thử Toàn Trang Này
+        </button>
+        <button class="btn-primary" id="btnSaveOCREdits">
+          💾 Lưu & Cập Nhật Lời Đọc
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice & TTS Settings Modal -->
+  <div class="modal-backdrop" id="ttsModal">
+    <div class="modal-window" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title">🎙️ Cấu Hình Giọng Đọc Truyện (Text-To-Speech)</div>
+        <button class="icon-btn" id="btnCloseTTSModal" style="width: 28px; height: 28px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Provider Selector -->
+        <div class="provider-toggle-group">
+          <button class="provider-tab-btn active" id="tabProviderGoogle">
+            ☁️ Google Cloud Text-to-Speech (Neural2 / WaveNet)
+          </button>
+          <button class="provider-tab-btn" id="tabProviderBrowser">
+            💻 Trình Duyệt (Browser SpeechSynthesis)
+          </button>
+        </div>
+
+        <!-- Google Cloud Settings Area -->
+        <div id="googleTTSSettingsArea">
+          <div class="control-row">
+            <div class="control-label">
+              <span>Google Cloud API Key (Tùy chọn):</span>
+              <span style="font-size: 10px; color: var(--accent-cyan); cursor: pointer;" id="toggleKeyVisibility">Hiện / Ẩn Key</span>
+            </div>
+            <input type="password" id="ttsApiKeyInput" placeholder="Nhập khóa API Key của bạn (AIzaSy...)" style="width: 100%; padding: 8px 10px; background: #06080e; border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px;">
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              🔒 Khóa API được lưu cục bộ trong <code>localStorage</code> trên máy của bạn. Khi có khóa, âm thanh giọng nói Neural sẽ được nhúng trực tiếp vào video khi xuất file.
+            </p>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Giọng Đọc Google Neural2 / WaveNet:</span>
+            </div>
+            <select id="ttsGoogleVoiceSelect" style="width: 100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <!-- Populated from MangaTTSEngine.GOOGLE_VOICES -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Browser Speech Settings Area -->
+        <div id="browserTTSSettingsArea" style="display: none;">
+          <div class="control-row">
+            <div class="control-label">
+              <span>Giọng Đọc Có Sẵn Trong Trình Duyệt:</span>
+            </div>
+            <select id="ttsBrowserVoiceSelect" style="width: 100%; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <!-- Populated from window.speechSynthesis.getVoices() -->
+            </select>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Miễn phí và chạy hoàn toàn offline không cần kết nối mạng.
+            </p>
+          </div>
+        </div>
+
+        <!-- Sliders: Rate, Pitch, Volume -->
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+          <div class="control-row">
+            <div class="control-label">
+              <span>Tốc Độ Đọc (Speaking Rate):</span>
+              <span id="ttsRateVal">1.0x</span>
+            </div>
+            <input type="range" id="ttsRateInput" min="0.5" max="2.0" step="0.05" value="1.0">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Cao Độ Giọng (Pitch):</span>
+              <span id="ttsPitchVal">1.0</span>
+            </div>
+            <input type="range" id="ttsPitchInput" min="0.5" max="1.5" step="0.05" value="1.0">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Âm Lượng (Volume):</span>
+              <span id="ttsVolumeVal">1.0</span>
+            </div>
+            <input type="range" id="ttsVolumeInput" min="0.0" max="1.0" step="0.05" value="1.0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnTestTTSVoice">
+          🔊 Nghe Thử Câu Mẫu
+        </button>
+        <button class="btn-primary" id="btnSaveTTSSettings">
+          ✅ Áp Dụng Giọng Đọc
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Export Video Modal -->
   <div class="modal-backdrop" id="exportModal">
     <div class="modal-window">
       <div class="modal-header">
-        <div class="modal-title">🎬 Xuất Video Hành Động (Action Video Exporter)</div>
+        <div class="modal-title">🎬 Xuất Video Điện Ảnh (Export 60 FPS)</div>
         <button class="icon-btn" id="btnCloseExport" style="width: 28px; height: 28px;">✕</button>
       </div>
       <div class="modal-body">
+        <!-- Export Mode Choice -->
+        <div class="control-row">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">
+            Chế Độ Xuất Video:
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <label style="flex: 1; background: var(--bg-tertiary); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+              <input type="radio" name="exportModeRadio" id="radioExportChapter" value="chapter" checked>
+              <span>📖 Chapter Video (Kèm Giọng Đọc TTS)</span>
+            </label>
+            <label style="flex: 1; background: var(--bg-tertiary); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+              <input type="radio" name="exportModeRadio" id="radioExportAction" value="action">
+              <span>⚡ Phân Cảnh Hành Động (Action FX)</span>
+            </label>
+          </div>
+        </div>
+
         <div>
           <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">
             Độ Phân Giải & Tỉ Lệ Khung Hình:

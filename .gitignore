@@ -2,6 +2,10 @@ node_modules
 dist
 dist-ssr
 *.local
+*.traineddata
+.env
+.env.*
+!.env.example
 .vscode/
 .idea/
 .DS_Store
