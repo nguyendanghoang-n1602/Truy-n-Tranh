@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MangaMotion AI Studio - Chuyển Đổi Trang Truyện Sang Video Hành Động</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Studio Header -->
+    <header class="studio-header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-title">Manga<span>Motion</span> Pro</div>
+        <span class="badge-pro">Senior Core</span>
+      </div>
+
+      <div class="header-center">
+        <div class="sample-selector" id="samplePicker">
+          <button class="sample-btn active" data-sample="samurai-slash">🗡️ Kiếm Sĩ Trảm Quỷ (Manga)</button>
+          <button class="sample-btn" data-sample="shadow-hunter">⚡ Thợ Săn Lôi Đình (Webtoon)</button>
+        </div>
+
+        <label class="upload-label" title="Tải lên trang truyện của bạn (JPG, PNG, WebP)">
+          📁 <span>Tải Trang Khác</span>
+          <input type="file" id="fileUpload" accept="image/*" style="display: none;">
+        </label>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-secondary" id="btnAudioToggle" title="Bật/Tắt âm thanh hành động (Synthesizer)">
+          <span id="audioIcon">🔊</span> <span id="audioLabel">Âm thanh: Bật</span>
+        </button>
+        <button class="btn-secondary" id="btnOpenAIBridge">
+          🤖 AI Video Bridge
+        </button>
+        <button class="btn-primary" id="btnOpenExport">
+          🎬 Xuất Video (MP4/WebM)
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Studio Body -->
+    <div class="studio-body">
+      <!-- Left Sidebar: Panels & Layout Manager -->
+      <aside class="panel-sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Khung Truyện & Phân Cảnh</span>
+          <span class="tag" id="panelCountTag">5 Cảnh</span>
+        </div>
+
+        <div class="sidebar-controls">
+          <button class="btn-secondary btn-full-width" id="btnAutoDetect">
+            ✨ Tự Động Quét Panel (AI CV)
+          </button>
+          <button class="btn-secondary btn-full-width" id="btnToggleFullPage">
+            🔍 Xem Toàn Trang & Tùy Chỉnh
+          </button>
+        </div>
+
+        <!-- Scrollable panel scene list -->
+        <div class="panel-list" id="panelListContainer">
+          <!-- Dynamically populated cards -->
+        </div>
+      </aside>
+
+      <!-- Center: Cinema Action Viewport -->
+      <main class="cinema-stage">
+        <!-- HUD Stats -->
+        <div class="stage-hud">
+          <div class="hud-panel-info">
+            <div class="hud-dot"></div>
+            <span id="hudPanelTitle">Panel 1: Rút Kiếm Sát Khí</span>
+          </div>
+          <div class="hud-stats">
+            <span id="hudFps">60 FPS</span> | <span id="hudTimecode">00:00.00 / 00:09.70</span>
+          </div>
+        </div>
+
+        <!-- High-res Render Viewport -->
+        <div class="stage-viewport">
+          <div class="canvas-wrapper" id="canvasContainer">
+            <canvas id="renderCanvas" width="1280" height="720"></canvas>
+          </div>
+        </div>
+
+        <!-- Full-page Bounding Box Interactive Modal Overlay -->
+        <div class="fullpage-modal-overlay" id="fullPageOverlay">
+          <div class="fullpage-header">
+            <div>
+              <h3>Bản Đồ Phân Cắt Trang Truyện (Bounding Box Editor)</h3>
+              <p style="font-size: 12px; color: var(--text-secondary);">Nhấp và kéo các khung xanh để điều chỉnh khu vực camera cắt cho từng cảnh hành động</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" id="btnAddPanelManual">➕ Thêm Khung Mới</button>
+              <button class="btn-primary" id="btnCloseFullPage">Đóng & Áp Dụng</button>
+            </div>
+          </div>
+          <div class="fullpage-canvas-box">
+            <canvas id="boundsCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Transport & Timeline Bar -->
+        <div class="stage-timeline-bar">
+          <div class="transport-buttons">
+            <button class="icon-btn" id="btnStepPrev" title="Cảnh trước">⏮️</button>
+            <button class="icon-btn primary" id="btnPlayPause" title="Phát / Dừng">▶️</button>
+            <button class="icon-btn" id="btnStepNext" title="Cảnh sau">⏭️</button>
+            <button class="icon-btn" id="btnLoopToggle" title="Lặp lại">🔁</button>
+          </div>
+
+          <div class="timeline-scrubber-area">
+            <div class="timeline-info">
+              <span id="timelineCurrentTime">0.00s</span>
+              <span id="timelinePanelIndicator">Phân cảnh 1 / 5</span>
+              <span id="timelineTotalDuration">9.70s</span>
+            </div>
+            <div class="scrubber-track" id="timelineTrack">
+              <div class="scrubber-fill" id="timelineFill"></div>
+              <div class="scrubber-markers" id="timelineMarkers"></div>
+            </div>
+          </div>
+
+          <div class="aspect-ratio-selector">
+            <button class="ratio-btn active" data-ratio="16:9">16:9 Ngang</button>
+            <button class="ratio-btn" data-ratio="9:16">9:16 Dọc (Shorts)</button>
+            <button class="ratio-btn" data-ratio="1:1">1:1 Vuông</button>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Sidebar: FX & Director Controls -->
+      <aside class="director-sidebar">
+        <div class="director-header">
+          <span class="sidebar-title">Đạo Diễn Kỹ Xảo (Director FX)</span>
+          <span class="badge-pro" id="currentPanelBadge">P1</span>
+        </div>
+
+        <!-- Presets -->
+        <div class="section-group">
+          <div class="section-title">⚡ Chế Độ Hành Động Mẫu</div>
+          <div class="choreography-presets">
+            <button class="preset-chip" data-preset="slash">🗡️ Nhất Trảm Kiếm</button>
+            <button class="preset-chip" data-preset="impact">💥 Va Đập Bộc Phá</button>
+            <button class="preset-chip" data-preset="dash">🌪️ Tốc Biến Lướt</button>
+            <button class="preset-chip" data-preset="charge">⚡ Thức Tỉnh Năng Lượng</button>
+            <button class="preset-chip" data-preset="zoom">🔍 Punch-in Zoom</button>
+            <button class="preset-chip" data-preset="victory">🏆 Cảnh Hạ Màn</button>
+          </div>
+        </div>
+
+        <!-- Camera Controls -->
+        <div class="section-group">
+          <div class="section-title">🎥 Ống Kính Camera & Rung Động</div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Zoom Đích (Độ phóng đại)</span>
+              <span id="valZoomEnd">1.25x</span>
+            </div>
+            <input type="range" id="inputZoomEnd" min="1.0" max="2.5" step="0.05" value="1.25">
+          </div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Góc Nghiêng Máy (Dutch Angle)</span>
+              <span id="valRotation">0°</span>
+            </div>
+            <input type="range" id="inputRotation" min="-15" max="15" step="1" value="0">
+          </div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Cường Độ Rung Chấn (Impact Shake)</span>
+              <span id="valShake">6px</span>
+            </div>
+            <input type="range" id="inputShake" min="0" max="25" step="1" value="6">
+          </div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Thời Lượng Cảnh</span>
+              <span id="valDuration">2.2s</span>
+            </div>
+            <input type="range" id="inputDuration" min="0.8" max="5.0" step="0.1" value="2.2">
+          </div>
+        </div>
+
+        <!-- Action VFX Controls -->
+        <div class="section-group">
+          <div class="section-title">✨ Hiệu Ứng Hành Động (Action VFX)</div>
+          
+          <div class="toggle-row">
+            <span>Đường Tập Trung Hướng Tâm (Focus Lines)</span>
+            <label class="switch">
+              <input type="checkbox" id="chkFocusLines">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+          <div class="control-row" id="focusIntensityRow">
+            <div class="control-label">
+              <span>Mật Độ Tia Focus</span>
+              <span id="valFocusIntensity">0.8</span>
+            </div>
+            <input type="range" id="inputFocusIntensity" min="0.2" max="1.5" step="0.05" value="0.8">
+          </div>
+
+          <div class="toggle-row">
+            <span>Đường Tốc Độ Lướt (Speed Lines)</span>
+            <label class="switch">
+              <input type="checkbox" id="chkSpeedLines">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span>Vệt Chém Trăng Lưỡi Liềm (Slash Arc)</span>
+            <label class="switch">
+              <input type="checkbox" id="chkSlashArc">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span>Chớp Sáng Va Đập (Screen Flash)</span>
+            <label class="switch">
+              <input type="checkbox" id="chkFlash">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <span>Bụi Lửa & Tia Lửa (Sparks Particles)</span>
+            <label class="switch">
+              <input type="checkbox" id="chkSparks">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Audio Synthesizer Controls -->
+        <div class="section-group">
+          <div class="section-title">🔊 Âm Thanh Hành Động (SFX)</div>
+          <div class="control-row">
+            <div class="control-label">
+              <span>Hiệu Ứng Âm Thanh Chính</span>
+            </div>
+            <select id="selectSound" style="width: 100%; padding: 7px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm); font-size: 12px;">
+              <option value="slash">🗡️ Tiếng Chém Kim Loại (Blade Slash)</option>
+              <option value="heavy_impact">💥 Va Đập Nổ Lớn (Heavy Boom)</option>
+              <option value="dash">🌪️ Xé Gió Thần Tốc (Sonic Whoosh)</option>
+              <option value="lightning">⚡ Sấm Sét Giật (Lightning Zap)</option>
+              <option value="charge">🔋 Tụ Khí / Thức Tỉnh (Charge Up)</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button class="btn-secondary" style="flex: 1;" id="btnTestAudio">
+              ▶ Thử Âm Thanh
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Export Video Modal -->
+  <div class="modal-backdrop" id="exportModal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title">🎬 Xuất Video Hành Động (Action Video Exporter)</div>
+        <button class="icon-btn" id="btnCloseExport" style="width: 28px; height: 28px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">
+            Độ Phân Giải & Tỉ Lệ Khung Hình:
+          </label>
+          <select id="exportResolutionSelect" style="width: 100%; padding: 9px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: #fff; border-radius: var(--radius-sm);">
+            <option value="1920x1080">Full HD 1080p (1920x1080 - 16:9 Youtube/PC)</option>
+            <option value="1080x1920">Vertical Shorts / TikTok (1080x1920 - 9:16)</option>
+            <option value="1080x1080">Square 1:1 (1080x1080 - Instagram/Feed)</option>
+            <option value="1280x720">HD 720p (1280x720 - Siêu nhanh)</option>
+          </select>
+        </div>
+
+        <div id="exportStatusArea" style="display: none;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600;">
+            <span id="exportStatusText">Đang tổng hợp 60 FPS & lồng ghép âm thanh...</span>
+            <span id="exportPercentText">0%</span>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar-fill" id="exportProgressBar"></div>
+          </div>
+        </div>
+
+        <div id="exportResultArea" style="display: none; flex-direction: column; gap: 12px;">
+          <div style="font-size: 13px; color: var(--accent-cyan); font-weight: 600;">
+            🎉 Đã render hoàn tất video chất lượng cao!
+          </div>
+          <video id="exportVideoPreview" controls style="width: 100%; max-height: 240px; border-radius: var(--radius-md); background: #000;"></video>
+          <a id="btnDownloadVideo" class="btn-primary" style="text-decoration: none; text-align: center; justify-content: center;" download>
+            💾 Tải Video Về Máy (.mp4 / .webm)
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer" id="exportModalFooter">
+        <button class="btn-secondary" id="btnCancelExport">Hủy</button>
+        <button class="btn-primary" id="btnStartExport">🚀 Bắt Đầu Render Video</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Bridge Modal -->
+  <div class="modal-backdrop" id="aiBridgeModal">
+    <div class="modal-window" style="max-width: 720px;">
+      <div class="modal-header">
+        <div class="modal-title">🤖 Cổng Kết Nối AI Image-to-Video Generator</div>
+        <button class="icon-btn" id="btnCloseAIBridge" style="width: 28px; height: 28px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12px; color: var(--text-secondary);">
+          Hệ thống tự động biên dịch camera matrices, nhịp độ hành động và hiệu ứng manga thành prompt & payload chuẩn cho các mô hình AI Video tiên tiến nhất (Runway Gen-3, Kling 1.5, AnimateDiff ComfyUI).
+        </p>
+
+        <div style="display: flex; gap: 8px;">
+          <button class="sample-btn active" id="tabRunway">Runway Gen-3 / Kling API</button>
+          <button class="sample-btn" id="tabComfyUI">ComfyUI AnimateDiff Workflow</button>
+        </div>
+
+        <div class="code-box" id="aiPayloadBox"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px; color: var(--accent-cyan);" id="aiCopyNotice"></span>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-secondary" id="btnCopyAIPayload">📋 Sao Chép Payload</button>
+            <button class="btn-secondary" id="btnDownloadAIJson">💾 Tải Tệp JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
